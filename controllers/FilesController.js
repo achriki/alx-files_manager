@@ -11,7 +11,7 @@ class FilesController {
         const {name, type, parentId, isPublic, data} = req.body;
         const dir = process.env.FOLDER_PATH || '/tmp/files_manager';
         const fileQ = new Queue('fileQ');
-        
+
         if(!name) {
             return res.status(400).json({ error: 'Missing name' });
         }
@@ -19,7 +19,7 @@ class FilesController {
             return res.status(400).json({ error: 'Missing type' });
         }
 
-        const { userId } = await userUtils.getUserIdAndKey(request);
+        const { userId } = await userUtils.getUserIdAndKey(req);
         if(!userUtils.isValidId(userId)) {
             return res.status(401).send({ error: 'Unauthorized' });
         }
@@ -39,7 +39,7 @@ class FilesController {
         }
         const user = await dbClient.users.findOne({ _id: ObjectId(userId) });
         if(!user) {
-            return response.status(401).send({ error: 'Unauthorized' });   
+            return res.status(401).send({ error: 'Unauthorized' });   
         }
 
         const fileInsertObject = {
@@ -67,12 +67,12 @@ class FilesController {
         const filePath = `${dir}/${fileId}`;
 
         mkdir(dir, {recursive: true}, (err) => {
-            if (err) return response.status(400).send({ err: err.message });
+            if (err) return res.status(400).send({ err: err.message });
             return true;
         });
 
         writeFile(filePath, decData, (err) => {
-            if (err) return response.status(400).send({ err: err.message });
+            if (err) return res.status(400).send({ err: err.message });
             return true;
         })
 
@@ -93,6 +93,68 @@ class FilesController {
             parentId: fileInsertData.parentId,
             localPath: fileInsertObject.localPath
         });
+    }
+
+    static async getShow(req, res){
+        const { userId } = await userUtils.getUserIdAndKeyKey(req);
+        if (!userUtils.isValidId(userId)) return res.status(401).send({ error: 'Unauthorized' });
+
+        const user = await dbClient.users.findOne({ _id: ObjectId(userId) });
+        if (!user) return res.status(401).send({ error: 'Unauthorized' });
+        const fileId = req.params.id || '';
+        const file = await dbClient.files.findOne({ _id: ObjectId(fileId), userId: user._id });
+        if (!file) return res.status(404).send({ error: 'Not found' });
+    
+        return res.status(200).send({
+          id: file._id,
+          userId: file.userId,
+          name: file.name,
+          type: file.type,
+          isPublic: file.isPublic,
+          parentId: file.parentId
+        });
+    }
+
+    static async getIndex (req, res) {
+        const { userId } = await userUtils.getUserIdAndKey(req);
+        if (!userUtils.isValidId(userId)) return res.status(401).send({ error: 'Unauthorized' });
+    
+        const user = await dbClient.users.findOne({ _id: ObjectId(userId) });
+        if (!user) return res.status(401).send({ error: 'Unauthorized' });
+    
+        let parentId = req.query.parentId || 0;
+        if (parentId === '0') parentId = 0;
+        if (parentId !== 0) {
+          if (!userUtils.isValidId(parentId)) return res.status(401).send({ error: 'Unauthorized' });
+    
+          parentId = ObjectId(parentId);
+    
+          const folder = await dbClient.files.findOne({ _id: ObjectId(parentId) });
+          if (!folder || folder.type !== 'folder') return res.status(200).send([]);
+        }
+    
+        const page = req.query.page || 0;
+    
+        const agg = { $and: [{ parentId }] };
+        let aggData = [{ $match: agg }, { $skip: page * 20 }, { $limit: 20 }];
+        if (parentId === 0) aggData = [{ $skip: page * 20 }, { $limit: 20 }];
+    
+        const pageFiles = await dbClient.files.aggregate(aggData);
+        const files = [];
+    
+        await pageFiles.forEach((file) => {
+          const fileObj = {
+            id: file._id,
+            userId: file.userId,
+            name: file.name,
+            type: file.type,
+            isPublic: file.isPublic,
+            parentId: file.parentId
+          };
+          files.push(fileObj);
+        });
+    
+        return res.status(200).send(files);
     }
 }
 
