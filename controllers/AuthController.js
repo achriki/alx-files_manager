@@ -14,7 +14,7 @@ class AuthController {
             const auth = Buffer.from(authHeader.split(' ')[1], 'base64').toString().split(':');
             const email = auth[0];
             const password = sha1(auth[1]);
-
+            console.log("email", email)
             const user = await dbClient.getUser({email});
             if (!user) {
                 response.status(401).json({ error: 'Unauthorized' });
@@ -30,7 +30,7 @@ class AuthController {
       
             response.status(200).json({ token });      
         }catch(error){
-            console.log(err);
+            console.log(error);
             response.status(500).json({ error: 'Server error' });
         }
     }

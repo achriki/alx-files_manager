@@ -9,14 +9,10 @@ class DBClient {
     constructor() {
         this.db = null;
         MongoClient.connect(url, { useUnifiedTopology: true }, (error, client) => {
-            if (!error) {
-                this.db = client.db(database);
-                this.users = this.db.collection('users');
-                this.files = this.db.collection('files');
-              } else {
-                console.log(error.message);
-                this.db = false;
-              }
+            if (error) console.log(error);
+            this.db = client.db(database);
+            this.db.createCollection('users');
+            this.db.createCollection('files');
         });
     }
 
