@@ -52,6 +52,8 @@ class UsersController {
           response.status(500).json({ error: 'Server error' });
         }
     }
+
+    
 }
 
 export default UsersController;

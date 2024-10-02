@@ -96,7 +96,7 @@ class FilesController {
     }
 
     static async getShow(req, res){
-        const { userId } = await userUtils.getUserIdAndKeyKey(req);
+        const { userId } = await userUtils.getUserIdAndKey(req);
         if (!userUtils.isValidId(userId)) return res.status(401).send({ error: 'Unauthorized' });
 
         const user = await dbClient.users.findOne({ _id: ObjectId(userId) });
@@ -206,6 +206,33 @@ class FilesController {
             parentId: file.parentId
         });
     }
+
+    static async getFile (req, res) {
+        const fileId = req.params.id || '';
+        const size = req.query.size || 0;
+    
+        const file = await dbClient.files.findOne({ _id: ObjectId(fileId) });
+        if (!file) return res.status(404).send({ error: 'Not found' });
+    
+        const { isPublic, userId, type } = file;
+    
+        const { userId: user } = await userUtils.getUserIdAndKey(req);
+    
+        if ((!isPublic && !user) || (user && userId.toString() !== user && !isPublic)) return res.status(404).send({ error: 'Not found' });
+        if (type === 'folder') return res.status(400).send({ error: 'A folder doesn\'t have content' });
+    
+        const path = size === 0 ? file.localPath : `${file.localPath}_${size}`;
+    
+        try {
+          const fileData = readFileSync(path);
+          const mimeType = mime.contentType(file.name);
+          res.setHeader('Content-Type', mimeType);
+          return res.status(200).send(fileData);
+        } catch (err) {
+          return res.status(404).send({ error: 'Not found' });
+        }
+    }
+    
 }
 
 export default FilesController
